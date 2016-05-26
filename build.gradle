@@ -7,8 +7,16 @@ sourceCompatibility = 1.5
 
 repositories {
     mavenCentral()
+    maven {
+        url "http://m2.j6mes.co/"
+    }
+    maven {
+        url "http://clojars.org/repo/"
+    }
 }
 
 dependencies {
-    testCompile group: 'junit', name: 'junit', version: '4.11'
+    compile 'gpig.group2:layer-services:1.2.38'
+    compile 'org.clojars.ndimiduk:geodesy:1.1.1'
+    compile 'de.grundid.opendatalab:geojson-jackson:1.6'
 }
