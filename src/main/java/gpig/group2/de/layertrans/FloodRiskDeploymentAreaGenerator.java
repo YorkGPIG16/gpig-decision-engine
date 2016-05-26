@@ -18,8 +18,8 @@ public class FloodRiskDeploymentAreaGenerator {
     public FloodRiskDeploymentAreaGenerator() {
     }
 
-    static final double maxWidth = 500;
-    static final double maxHeight = 500;
+    static final double maxWidth = 400;
+    static final double maxHeight = 400;
 
     public static void main(String args[]) throws IOException {
 
@@ -32,27 +32,32 @@ public class FloodRiskDeploymentAreaGenerator {
         List<Extents> originalExtents = new ArrayList<>();
         for(Feature f : featureCollection.getFeatures()) {
 
-            System.out.println(f.getGeometry().getClass().getName());
-
-            Extents e = new Extents(f.getGeometry());
-            originalExtents.add(e);
-
-
-            /*
-            GeoJsonObject g = f.getGeometry();
-            if(g instanceof Polygon) {
-                Extents e = new Extents(((Polygon)f.getGeometry()).getExteriorRing());
-                originalExtents.add(e);
-            } else if (g instanceof MultiPolygon){
-                for(List<List<LngLatAlt>> t : ((MultiPolygon) g).getCoordinates()) {
-
-                    for(List<LngLatAlt> u : t) {
-                        Extents e = new Extents(u);
+            if(f.getProperty("BASED_ON_E") != null) {
+                if(f.getProperty("BASED_ON_E").equals("1in1000"))
+                {
+                    GeoJsonObject g = f.getGeometry();
+                    if(g instanceof Polygon) {
+                        Extents e = new Extents(((Polygon)f.getGeometry()).getExteriorRing());
                         originalExtents.add(e);
+                    } else if (g instanceof MultiPolygon){
+                        for(List<List<LngLatAlt>> t : ((MultiPolygon) g).getCoordinates()) {
+
+                            for(List<LngLatAlt> u : t) {
+                                Extents e = new Extents(u);
+                                originalExtents.add(e);
+                            }
+                        }
                     }
+
                 }
             }
-            */
+
+/*
+            Extents e = new Extents(f.getGeometry());
+            originalExtents.add(e);
+  */
+
+
 
 
 
@@ -60,7 +65,8 @@ public class FloodRiskDeploymentAreaGenerator {
         }
 
 
-        List<Extents> newExtents = new ArrayList<>();
+
+        List<Extents> newExtentsToCheck = new ArrayList<>();
         for(Extents e : originalExtents) {
 
 
@@ -71,26 +77,72 @@ public class FloodRiskDeploymentAreaGenerator {
                 tmp.addAll(e.hSplit(maxHeight));
 
                 for(Extents tempe : tmp) {
-                    newExtents.addAll(tempe.wSplit(maxWidth));
+                    newExtentsToCheck.addAll(tempe.wSplit(maxWidth));
                 }
 
             } else if(e.getWidth() > maxWidth) {
                 // trim width
-                newExtents.addAll(e.wSplit(maxWidth));
+                newExtentsToCheck.addAll(e.wSplit(maxWidth));
             } else if(e.getHeight() > maxHeight) {
                 //trim height
-                newExtents.addAll(e.hSplit(maxHeight));
+                newExtentsToCheck.addAll(e.hSplit(maxHeight));
             } else {
-                newExtents.add(e);
+                newExtentsToCheck.add(e);
 
             }
-
-
 
         }
 
 
+
+
+
+        List<Extents> newExtents = new ArrayList<>();
+        for(Extents e : newExtentsToCheck) {
+
+            if(e.intersectsExtent() || e.containedByExtent()) {
+                newExtents.add(e);
+            }
+        }
+
+
+
+
+
+        Integer eid = 0;
+
+        FeatureCollection fc = new FeatureCollection();
+        for(Extents e : newExtents) {
+
+            List<LngLatAlt> llas = new ArrayList<>();
+
+            llas.add(new LngLatAlt(e.getExtents().getTopLeftX().getLongitudeX(),e.getExtents().getTopLeftX().getLatitudeX()));
+            llas.add(new LngLatAlt(e.getExtents().getBottomRightX().getLongitudeX(),e.getExtents().getTopLeftX().getLatitudeX()));
+            llas.add(new LngLatAlt(e.getExtents().getBottomRightX().getLongitudeX(),e.getExtents().getBottomRightX().getLatitudeX()));
+            llas.add(new LngLatAlt(e.getExtents().getTopLeftX().getLongitudeX(),e.getExtents().getBottomRightX().getLatitudeX()));
+            llas.add(new LngLatAlt(e.getExtents().getTopLeftX().getLongitudeX(),e.getExtents().getTopLeftX().getLatitudeX()));
+
+
+            Feature f = new Feature();
+
+            Polygon p = new Polygon();
+            p.setExteriorRing(llas);
+
+            f.setGeometry(p);
+            eid++;
+            f.setId(eid.toString());
+            fc.add(f);
+        }
+
+
+
+
         System.out.println(newExtents.size());
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        mapper.writeValue(new File("das.geojson"), fc);
+
 
     }
 }
