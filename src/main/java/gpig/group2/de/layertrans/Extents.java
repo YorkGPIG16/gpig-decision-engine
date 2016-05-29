@@ -227,5 +227,44 @@ public class Extents {
         return this.getPathOfExtents().intersects(getBoxOfBoundingBox());
     }
 
+
+    public Double density = 0.0;
+
+    public Scale priority;
+    public void upgrade(Scale pd) {
+        if(priority == null) {
+            priority = pd;
+        } else if(getPriorityValue(priority)<getPriorityValue(pd)) {
+            priority = pd;
+        }
+
+    }
+
+    public void upgradeDensity(double pd) {
+
+        if(density<pd) {
+            density = pd;
+        }
+
+    }
+
+    public static int getPriorityValue(Scale priority) {
+        if(priority == null) {
+            return 0;
+        }
+        switch (priority) {
+            case VeryHigh:
+                return 5;
+            case High:
+                return 4;
+            case Medium:
+                return 3;
+            case Low:
+                return 2;
+            case VeryLow:
+                return 1;
+        }
+        return 0;
+    }
 }
 

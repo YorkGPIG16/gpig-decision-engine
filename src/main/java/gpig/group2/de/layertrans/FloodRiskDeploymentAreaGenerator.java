@@ -21,8 +21,50 @@ public class FloodRiskDeploymentAreaGenerator {
     static final double maxWidth = 400;
     static final double maxHeight = 400;
 
-    public static void main(String args[]) throws IOException {
 
+    public static void main(String args[]) throws IOException {
+        FloodRiskDeploymentAreaGenerator g = new FloodRiskDeploymentAreaGenerator();
+        List<Extents> newExtents = g.getFeatures();
+
+        Integer eid = 0;
+
+        FeatureCollection fc = new FeatureCollection();
+        for(Extents e : newExtents) {
+
+            List<LngLatAlt> llas = new ArrayList<>();
+
+            llas.add(new LngLatAlt(e.getExtents().getTopLeftX().getLongitudeX(),e.getExtents().getTopLeftX().getLatitudeX()));
+            llas.add(new LngLatAlt(e.getExtents().getBottomRightX().getLongitudeX(),e.getExtents().getTopLeftX().getLatitudeX()));
+            llas.add(new LngLatAlt(e.getExtents().getBottomRightX().getLongitudeX(),e.getExtents().getBottomRightX().getLatitudeX()));
+            llas.add(new LngLatAlt(e.getExtents().getTopLeftX().getLongitudeX(),e.getExtents().getBottomRightX().getLatitudeX()));
+            llas.add(new LngLatAlt(e.getExtents().getTopLeftX().getLongitudeX(),e.getExtents().getTopLeftX().getLatitudeX()));
+
+
+            Feature f = new Feature();
+
+            Polygon p = new Polygon();
+            p.setExteriorRing(llas);
+
+            f.setGeometry(p);
+            eid++;
+            f.setId(eid.toString());
+            fc.add(f);
+        }
+
+
+
+
+        System.out.println(newExtents.size());
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        mapper.writeValue(new File("das.geojson"), fc);
+
+
+
+    }
+
+    public List<Extents> getFeatures() throws IOException {
         FileInputStream fis = new FileInputStream(new File("SFRA_Flood_Zones.geojson"));
 
         FeatureCollection featureCollection =
@@ -105,43 +147,11 @@ public class FloodRiskDeploymentAreaGenerator {
             }
         }
 
+        return newExtents;
 
 
 
 
-        Integer eid = 0;
-
-        FeatureCollection fc = new FeatureCollection();
-        for(Extents e : newExtents) {
-
-            List<LngLatAlt> llas = new ArrayList<>();
-
-            llas.add(new LngLatAlt(e.getExtents().getTopLeftX().getLongitudeX(),e.getExtents().getTopLeftX().getLatitudeX()));
-            llas.add(new LngLatAlt(e.getExtents().getBottomRightX().getLongitudeX(),e.getExtents().getTopLeftX().getLatitudeX()));
-            llas.add(new LngLatAlt(e.getExtents().getBottomRightX().getLongitudeX(),e.getExtents().getBottomRightX().getLatitudeX()));
-            llas.add(new LngLatAlt(e.getExtents().getTopLeftX().getLongitudeX(),e.getExtents().getBottomRightX().getLatitudeX()));
-            llas.add(new LngLatAlt(e.getExtents().getTopLeftX().getLongitudeX(),e.getExtents().getTopLeftX().getLatitudeX()));
-
-
-            Feature f = new Feature();
-
-            Polygon p = new Polygon();
-            p.setExteriorRing(llas);
-
-            f.setGeometry(p);
-            eid++;
-            f.setId(eid.toString());
-            fc.add(f);
-        }
-
-
-
-
-        System.out.println(newExtents.size());
-
-        ObjectMapper mapper = new ObjectMapper();
-
-        mapper.writeValue(new File("das.geojson"), fc);
 
 
     }
