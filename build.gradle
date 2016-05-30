@@ -16,8 +16,15 @@ repositories {
 }
 
 dependencies {
-    compile 'gpig.group2:layer-services:1.2.38'
+    compile 'gpig.group2:layer-services:1.4.43'
+    compile 'gpig.group2.models:drone-comms-model:1.2.25'
+
+
     compile 'org.clojars.ndimiduk:geodesy:1.1.1'
     compile 'de.grundid.opendatalab:geojson-jackson:1.6'
+    compile 'co.j6mes.infra.srf:service-registration-framework:1.0.1.8'
+    compile 'org.apache.httpcomponents:httpclient:4.5.2'
+    compile 'org.apache.httpcomponents:fluent-hc:4.5.2'
+
     compile group: 'math.geom2d', name: 'javaGeom', version: '0.11.1'
 }

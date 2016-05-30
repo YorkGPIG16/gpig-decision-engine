@@ -19,8 +19,7 @@ public class PopDensityAreaGenerator {
     static final double maxWidth = 400;
     static final double maxHeight = 400;
 
-    public static void main(String args[]) throws IOException {
-
+    public List<Extents> getFeatures() throws IOException {
         FileInputStream fis = new FileInputStream(new File("cdrc-2011-census-data-packs-for-local-authority-district-york-e06000014.geojson"));
 
         FeatureCollection featureCollection =
@@ -28,23 +27,23 @@ public class PopDensityAreaGenerator {
 
 
         List<PopulationExtents> originalExtents = new ArrayList<>();
-        for(Feature f : featureCollection.getFeatures()) {
+        for (Feature f : featureCollection.getFeatures()) {
 
 
-            if (f.getProperty("value")!=null) {
+            if (f.getProperty("value") != null) {
 
                 GeoJsonObject g = f.getGeometry();
                 if (g instanceof Polygon) {
                     PopulationExtents e = new PopulationExtents(((Polygon) f.getGeometry()).getExteriorRing());
 
 
-                    if((Double)f.getProperty("value") > 100) {
+                    if ((Double) f.getProperty("value") > 100) {
                         e.pd = Scale.VeryHigh;
-                    } else if ((Double)f.getProperty("value") > 50) {
+                    } else if ((Double) f.getProperty("value") > 50) {
                         e.pd = Scale.High;
-                    } else if ((Double)f.getProperty("value") > 10) {
+                    } else if ((Double) f.getProperty("value") > 10) {
                         e.pd = Scale.Medium;
-                    } else if ((Double)f.getProperty("value") > 5) {
+                    } else if ((Double) f.getProperty("value") > 5) {
                         e.pd = Scale.Low;
                     } else {
                         e.pd = Scale.VeryLow;
@@ -59,13 +58,13 @@ public class PopDensityAreaGenerator {
                         for (List<LngLatAlt> u : t) {
                             PopulationExtents e = new PopulationExtents(u);
 
-                            if((Double)f.getProperty("value") > 100) {
+                            if ((Double) f.getProperty("value") > 100) {
                                 e.pd = Scale.VeryHigh;
-                            } else if ((Double)f.getProperty("value")> 50) {
+                            } else if ((Double) f.getProperty("value") > 50) {
                                 e.pd = Scale.High;
-                            } else if ((Double)f.getProperty("value") > 10) {
+                            } else if ((Double) f.getProperty("value") > 10) {
                                 e.pd = Scale.Medium;
-                            } else if ((Double)f.getProperty("value") > 5) {
+                            } else if ((Double) f.getProperty("value") > 5) {
                                 e.pd = Scale.Low;
                             } else {
                                 e.pd = Scale.VeryLow;
@@ -87,10 +86,10 @@ public class PopDensityAreaGenerator {
         FloodRiskDeploymentAreaGenerator fag = new FloodRiskDeploymentAreaGenerator();
         List<Extents> floodsAreas = fag.getFeatures();
 
-        for(Extents e  :floodsAreas) {
-            for(PopulationExtents p : originalExtents) {
+        for (Extents e : floodsAreas) {
+            for (PopulationExtents p : originalExtents) {
 
-                if(p.getPathOfExtents().intersects(e.getBoxOfBoundingBox()) || e.getBoxOfBoundingBox().contains(p.getBoxOfBoundingBox())) {
+                if (p.getPathOfExtents().intersects(e.getBoxOfBoundingBox()) || e.getBoxOfBoundingBox().contains(p.getBoxOfBoundingBox())) {
                     e.upgrade(p.pd);
                     e.upgradeDensity(p.density);
                 }
@@ -98,10 +97,19 @@ public class PopDensityAreaGenerator {
         }
 
 
+        return floodsAreas;
+
+    }
+
+    public static void main(String args[]) throws IOException {
+        PopDensityAreaGenerator pdag = new PopDensityAreaGenerator();
+        List<Extents> floodsAreas = pdag.getFeatures();
+
         Integer eid = 0;
 
         FeatureCollection fc = new FeatureCollection();
         for(Extents e : floodsAreas) {
+
 
             List<LngLatAlt> llas = new ArrayList<>();
 
