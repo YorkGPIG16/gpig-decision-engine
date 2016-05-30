@@ -3,7 +3,7 @@ version '1.0-SNAPSHOT'
 
 apply plugin: 'java'
 
-sourceCompatibility = 1.5
+sourceCompatibility = 1.8
 
 repositories {
     mavenCentral()
@@ -28,3 +28,75 @@ dependencies {
 
     compile group: 'math.geom2d', name: 'javaGeom', version: '0.11.1'
 }
+
+
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'Decision Engine',
+                'Implementation-Version': version,
+                'Built-By': System.getProperty('user.name'),
+                'Built-Date': new Date(),
+                'Built-JDK': System.getProperty('java.version'),
+                'Built-Gradle': gradle.gradleVersion
+    }
+}
+
+
+
+task sourcesJar(type: Jar) {
+    classifier 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier 'javadoc'
+    from javadoc.destinationDir
+}
+
+task runFinalJar(type: JavaExec) {
+    classpath = files('build/libs/service-registration-framework-1.0.0-SNAPSHOT.jar')
+    classpath += sourceSets.main.runtimeClasspath
+    main = "co.j6mes.infra.srf.daemon.ServiceREgistrationDaemo"
+}
+
+
+artifacts {
+    archives sourcesJar
+    archives javadocJar
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+
+            pom.withXml {
+                def root = asNode()
+                root.appendNode('name', 'Decision Enginer')
+                root.appendNode('description', 'A decision engine')
+                root.appendNode('url', 'https://github.com/j6mes/gpig-de')
+                root.appendNode('inceptionYear', '2016')
+
+                def scm = root.appendNode('scm')
+                scm.appendNode('url', 'https://github.com/j6mes/gpig-de')
+                scm.appendNode('connection', 'scm:https://j6mes@github.com/j6mes/gpig-de.git')
+                scm.appendNode('developerConnection', 'scm:git://github.com/j6mes/gpig-de.git')
+
+                def license = root.appendNode('licenses').appendNode('license')
+                license.appendNode('name', 'The Apache Software License, Version 2.0')
+                license.appendNode('url', 'http://www.apache.org/licenses/LICENSE-2.0.txt')
+                license.appendNode('distribution', 'repo')
+
+                def developers = root.appendNode('developers')
+                def j6mes = developers.appendNode('developer')
+                j6mes.appendNode('id', 'j6mes')
+                j6mes.appendNode('name', 'James Thorne')
+                j6mes.appendNode('email', 'james@jthorne.co.uk')
+            }
+        }
+    }
+}
+
