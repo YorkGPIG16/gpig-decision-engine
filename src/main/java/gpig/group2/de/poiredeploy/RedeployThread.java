@@ -3,9 +3,13 @@ package gpig.group2.de.poiredeploy;
 import co.j6mes.infra.srf.query.QueryResponse;
 import co.j6mes.infra.srf.query.ServiceQuery;
 import co.j6mes.infra.srf.query.SimpleServiceQuery;
+import com.fasterxml.jackson.core.JsonGenerationException;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gpig.group2.models.drone.request.RequestMessage;
 import gpig.group2.models.drone.request.Task;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.fluent.Content;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.entity.ContentType;
@@ -20,6 +24,7 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.Unmarshaller;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.StringWriter;
 import java.util.*;
 
@@ -32,11 +37,9 @@ public class RedeployThread implements Runnable {
     public static void main(String args[]) throws InterruptedException {
 
         RedeployThread rd =new RedeployThread();
-        (new Thread(rd)).start();
 
-        while(true) {
-            Thread.sleep(40000);
-        }
+        rd.run();
+
 
     }
 
@@ -52,205 +55,115 @@ public class RedeployThread implements Runnable {
 
     @Override
     public void run() {
-        Thread t1 = new Thread(new Runnable() {
-            @Override
-            public void run() {
+        connectionUp = false;
+
+        ServiceQuery sq = new SimpleServiceQuery();
+
+        QueryResponse qr = sq.query("c2","maps");
+        if(qr.Path!=null) {
+            connectionUp = true;
+            path = "http://"+qr.IP+":"+qr.Port+"/"+qr.Path;
+        }
 
 
-                while(true) {
-
-                    synchronized (tthis){
-                        connectionUp = false;
-
-                        ServiceQuery sq = new SimpleServiceQuery();
-
-                        QueryResponse qr = sq.query("c2","maps");
-                        if(qr.Path!=null) {
-                            connectionUp = true;
-                            path = "http://"+qr.IP+":"+qr.Port+"/"+qr.Path;
-                        }
-
-                        tthis.notify();
-                    }
+        String url = "";
 
 
-                    try {
-                        Thread.sleep(10000);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
+        Integer[] lids = new Integer[] {2,3,5};
+        for(Integer lid : lids) {
 
-            }
-        });
-
-        t1.start();
-
-
-        /*
-            // Query Deployment Areas to see when they've been killed off
-            Thread t2 = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    while (true) {
-                        getDeploymentAreas();
-
-
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-
-                    }
-
-                }
-            });
-
-            t2.start();
-    */
-
-
-
-        while(true) {
-
-            getPOIs();
+            url = path + "layers/" + lid;
 
 
             try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+
+                Content cnt = Request.Get(url).execute().returnContent();
+                log.debug("Got POIs from C2: " + cnt.asString());
+
+                FeatureCollection featureCollection =
+                        new ObjectMapper().readValue(cnt.asStream(), FeatureCollection.class);
+
+                for (Feature f : featureCollection) {
 
 
-        }
-    }
+                    if (f.getGeometry() instanceof Point) {
+                        log.debug("Got point geometry");
 
-
-    public void getPOIs() {
-        String url = "";
-        synchronized (tthis) {
-            while(!connectionUp) {
-                try {
-                    tthis.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-            url = path+"layers/2";
-        }
-
-        try {
-
-            Content cnt = Request.Get(url).execute().returnContent();
-            log.debug("Got POIs from C2: " + cnt.asString());
-
-            FeatureCollection featureCollection =
-                    new ObjectMapper().readValue(cnt.asStream(), FeatureCollection.class);
-
-
-
-            for(Feature f : featureCollection) {
-
-                if(tasks.contains(f.<Integer>getProperty("task"))) {
-
-                    if(f.getGeometry() instanceof Point) {
                         Point p = (Point) f.getGeometry();
 
-                        Integer task = f.<Integer>getProperty("id");
+
+                        long R = 6378137;
+
+                        //offsets in meters
+                        int dn = 100;
+                        int de = 100;
+
+                        //Coordinate offsets in radians
+                        double dLat = dn / (R * Math.cos(Math.PI * p.getCoordinates().getLatitude() / 180));
+                        double dLon = de / (R * Math.cos(Math.PI * p.getCoordinates().getLatitude() / 180));
+
+                        //OffsetPosition, decimal degrees
+                        double maxLat = p.getCoordinates().getLatitude() + dLat * 180 / Math.PI;
+                        double maxLong = p.getCoordinates().getLongitude() + dLon * 180 / Math.PI;
+
+                        double minLat = p.getCoordinates().getLatitude() - dLat * 180 / Math.PI;
+                        double minLong = p.getCoordinates().getLongitude() - dLon * 180 / Math.PI;
 
 
-                        Date cd = completedTasks.get(f.<Integer>getProperty("task"));
-                        if(cd.getTime()<(new Date()).getTime()-1*60*1000) {
+                        List<LngLatAlt> llas = new ArrayList<>();
 
-                            long R=6378137;
-
-                            //offsets in meters
-                            int dn = 100;
-                            int de = 100;
-
-                            //Coordinate offsets in radians
-                            double dLat = dn/R;
-                            double dLon = de/(R* Math.cos(Math.PI * p.getCoordinates().getLatitude()/180));
-
-                            //OffsetPosition, decimal degrees
-                            double maxLat = p.getCoordinates().getLatitude() + dLat * 180/Math.PI;
-                            double maxLong =  p.getCoordinates().getLongitude() + dLon * 180/Math.PI;
-
-                            double minLat = p.getCoordinates().getLatitude() - dLat * 180/Math.PI;
-                            double minLong =  p.getCoordinates().getLongitude() - dLon * 180/Math.PI;
-
-
-                            List<LngLatAlt> llas = new ArrayList<>();
-
-                            {
-                                LngLatAlt lla = new LngLatAlt();
-                                lla.setLatitude(maxLat);
-                                lla.setLongitude(maxLong);
-                                llas.add(lla);
-                            }
-
-                            {
-                                LngLatAlt lla = new LngLatAlt();
-                                lla.setLatitude(maxLat);
-                                lla.setLongitude(minLong);
-                                llas.add(lla);
-                            }
-
-                            {
-                                LngLatAlt lla = new LngLatAlt();
-                                lla.setLatitude(minLat);
-                                lla.setLongitude(minLong);
-                                llas.add(lla);
-                            }
-
-                            {
-                                LngLatAlt lla = new LngLatAlt();
-                                lla.setLatitude(minLat);
-                                lla.setLongitude(maxLong);
-                                llas.add(lla);
-                            }
-
-                            {
-                                LngLatAlt lla = new LngLatAlt();
-                                lla.setLatitude(maxLat);
-                                lla.setLongitude(maxLong);
-                                llas.add(lla);
-                            }
-
-
-                            ObjectMapper mapper = new ObjectMapper();
-
-
-                            StringWriter sw = new StringWriter();
-                            Polygon poly = new Polygon();
-                            poly.setExteriorRing(llas);
-                            Feature newFeat = new Feature();
-                            newFeat.setGeometry(poly);
-                            mapper.writeValue(sw, f);
-
-                            Request.Post(path+"createForPOI/"+task)
-                                    .useExpectContinue()
-                                    .bodyString(sw.getBuffer().toString(), ContentType.APPLICATION_JSON)
-                                    .execute().returnContent().asBytes();
-
-
-
-
-
-
-
-
-
+                        {
+                            LngLatAlt lla = new LngLatAlt();
+                            lla.setLatitude(maxLat);
+                            lla.setLongitude(maxLong);
+                            llas.add(lla);
                         }
 
+                        {
+                            LngLatAlt lla = new LngLatAlt();
+                            lla.setLatitude(maxLat);
+                            lla.setLongitude(minLong);
+                            llas.add(lla);
+                        }
+
+                        {
+                            LngLatAlt lla = new LngLatAlt();
+                            lla.setLatitude(minLat);
+                            lla.setLongitude(minLong);
+                            llas.add(lla);
+                        }
+
+                        {
+                            LngLatAlt lla = new LngLatAlt();
+                            lla.setLatitude(minLat);
+                            lla.setLongitude(maxLong);
+                            llas.add(lla);
+                        }
+
+                        {
+                            LngLatAlt lla = new LngLatAlt();
+                            lla.setLatitude(maxLat);
+                            lla.setLongitude(maxLong);
+                            llas.add(lla);
+                        }
+
+
+                        ObjectMapper mapper = new ObjectMapper();
+
+
+                        StringWriter sw = new StringWriter();
+                        Polygon poly = new Polygon();
+                        poly.setExteriorRing(llas);
+                        Feature newFeat = new Feature();
+                        newFeat.setGeometry(poly);
+                        mapper.writeValue(sw, newFeat);
+
+                        System.out.println(sw.getBuffer().toString());
+
+                        System.out.println(Request.Post(path + "deployAreas/create")
+                                .useExpectContinue()
+                                .bodyString(sw.getBuffer().toString(), ContentType.APPLICATION_JSON)
+                                .execute().returnContent().asString());
 
 
                     }
@@ -259,17 +172,22 @@ public class RedeployThread implements Runnable {
                 }
 
 
+            } catch (JsonParseException e1) {
+                e1.printStackTrace();
+            } catch (JsonGenerationException e1) {
+                e1.printStackTrace();
+            } catch (ClientProtocolException e1) {
+                e1.printStackTrace();
+            } catch (JsonMappingException e1) {
+                e1.printStackTrace();
+            } catch (IOException e1) {
+                e1.printStackTrace();
             }
 
 
-
-
-        }catch (Exception ex) {
-            log.error(ex.getMessage());
-            log.error("ex Code sendPut: " + ex);
-            log.error("url:" + url);
-        } finally {
         }
+
+
 
 
     }
